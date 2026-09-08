@@ -5,7 +5,7 @@
 
 A Laravel Nova tool for grouping permissions and assigning roles and permissions to users. It uses Spatie's `laravel-permission` package.
 
-This release supports PHP 8.1+, Laravel Nova 5.9+, and `spatie/laravel-permission` 6.25+.
+This release supports PHP 8.1+, Laravel Nova 5.9+, and `spatie/laravel-permission` 6.25+, 7.x, or 8.3+.
 
 We have a Migration, Seed, Policy and Resource ready for a good Authorization Experience.
 

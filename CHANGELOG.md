@@ -3,6 +3,7 @@
 ## Unreleased
 
 - Target Nova 5.9 and its current Nova devtool build stack.
+- Support Spatie Laravel Permission 6.25+, 7.x, and 8.3+.
 - Use Spatie's canonical permission migration and publish an additive `group` migration.
 - Fix grouped checkbox serialization and group selection state on Nova 5.
 - Scope permissions and unique-name validation by guard.
