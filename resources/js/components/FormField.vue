@@ -9,25 +9,22 @@
       <div class="w-full">
         <div v-for="(permissions, group) in field.options" :key="group" class="mb-4">
           <h1 class="font-normal text-lg mb-3 my-2">
-            <checkbox :checked="isGroupChecked(group)" @click="toggleGroup(group)"/>
-            <label class="w-full ml-1" @click="toggleGroup(group)">
+            <Checkbox :checked="isGroupChecked(group)" @input="toggleGroup(group)" />
+            <button type="button" class="ml-1" @click="toggleGroup(group)">
               {{ __(group) }}
-            </label>
+            </button>
           </h1>
           <div class="grid grid-cols-4 gap-4 break-words">
-            <div v-for="(permission, option) in permissions" :key="permission.option">
-              <checkbox
+            <div v-for="permission in permissions" :key="permission.option">
+              <Checkbox
                 :value="permission.option"
                 :checked="isChecked(permission.option)"
                 @input="toggleOption(permission.option)"
               />
-              <label
-                :for="field.name"
-                v-text="permission.label"
-                @click="toggleOption(permission.option)"
-                class="w-full ml-1"
-              ></label>
-              </div>
+              <button type="button" class="ml-1" @click="toggleOption(permission.option)">
+                {{ permission.label }}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -48,24 +45,10 @@ export default {
     'resourceId',
     'field'
   ],
-  data: {
-    checkedGroups: [],
-  },
+  data: () => ({}),
   methods: {
-    avaiableOptions(group) {
+    availableOptions(group) {
       return this.field.options[group];
-    },
-
-    checkAll(group) {
-      this.avaiableOptions(group).forEach(
-        (permission) => this.check(permission.option)
-      );
-    },
-
-    uncheckAll(group) {
-      this.avaiableOptions(group).forEach(
-        (permission) => this.uncheck(permission.option)
-      );
     },
 
     isChecked(option) {
@@ -73,32 +56,26 @@ export default {
     },
 
     isGroupChecked(group) {
-      return this.checkedGroups.includes(group);
+      const options = this.availableOptions(group);
+      return options.length > 0 && options.every(permission => this.isChecked(permission.option));
     },
 
     check(option) {
       if (!this.isChecked(option)) {
-        this.value.push(option);
+        this.value = [...(this.value || []), option];
       }
     },
 
     uncheck(option) {
       if (this.isChecked(option)) {
-        this.value = this.value.filter(item => item != option);
+        this.value = this.value.filter(item => item !== option);
       }
     },
 
     toggleGroup(group) {
-      const index = this.checkedGroups.indexOf(group);
-      const checked = index > -1;
+      const checked = this.isGroupChecked(group);
 
-      if (checked) {
-        this.checkedGroups.splice(index, 1);
-      } else {
-        this.checkedGroups.push(group)
-      }
-
-      this.avaiableOptions(group).forEach(
+      this.availableOptions(group).forEach(
         (permission) => checked
           ? this.uncheck(permission.option)
           : this.check(permission.option)
@@ -114,7 +91,7 @@ export default {
     },
 
     fill(formData) {
-      formData.append(this.field.attribute, this.value || []);
+      this.fillIfVisible(formData, this.fieldAttribute, JSON.stringify(this.value || []));
     },
 
     handleChange(value) {

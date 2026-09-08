@@ -27,8 +27,8 @@ class Checkboxes extends Field
     {
         parent::__construct($name, $attribute, $resolveCallback);
 
-        $this->resolveUsing(function($value) {
-            return $value->pluck('name')->toArray();
+        $this->resolveUsing(function ($value) {
+            return $value?->pluck('name')->values()->all() ?? [];
         });
     }
 
@@ -52,20 +52,25 @@ class Checkboxes extends Field
      * @param  string                                  $attribute
      * @return void
      */
-    protected function fillAttributeFromRequest(NovaRequest $request, $requestAttribute, $model, $attribute)
+    protected function fillAttributeFromRequest(NovaRequest $request, string $requestAttribute, object $model, string $attribute): void
     {
-        if ($request->exists($requestAttribute)) {
-            /**
-             * When editing entries, they are returned as comma seperated string (unsure why).
-             * As a result we need to include this check and explode the values if required.
-             */
-            if (!is_array($choices = $request[$requestAttribute])) {
-                $permissions = collect(explode(',', $choices))->reject(function ($name) {
-                    return empty($name);
-                })->all();
-            }
-
-            $model->syncPermissions($permissions);
+        if (! $request->exists($requestAttribute)) {
+            return;
         }
+
+        $value = $request->input($requestAttribute, []);
+
+        if (is_string($value)) {
+            $decoded = json_decode($value, true);
+            $value = is_array($decoded) ? $decoded : explode(',', $value);
+        }
+
+        $permissions = collect($value)
+            ->filter(fn ($name) => is_string($name) && $name !== '')
+            ->unique()
+            ->values()
+            ->all();
+
+        $model->syncPermissions($permissions);
     }
 }

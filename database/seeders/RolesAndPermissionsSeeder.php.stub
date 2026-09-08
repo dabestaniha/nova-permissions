@@ -13,7 +13,7 @@ class RolesAndPermissionsSeeder extends Seeder
      *
      * @return void
      */
-    public function run()
+    public function run(): void
     {
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
@@ -30,19 +30,16 @@ class RolesAndPermissionsSeeder extends Seeder
             // ... // List all your Models you want to have Permissions for.
         ]);
 
-        $collection->each(function ($item, $key) {
-            // create permissions for each collection item
-            Permission::create(['group' => $item, 'name' => 'viewAny' . $item]);
-            Permission::create(['group' => $item, 'name' => 'view' . $item]);
-            Permission::create(['group' => $item, 'name' => 'update' . $item]);
-            Permission::create(['group' => $item, 'name' => 'create' . $item]);
-            Permission::create(['group' => $item, 'name' => 'delete' . $item]);
-            Permission::create(['group' => $item, 'name' => 'destroy' . $item]);
+        $collection->each(function ($item) {
+            collect(['viewAny', 'view', 'update', 'create', 'delete', 'restore', 'forceDelete'])
+                ->each(function ($ability) use ($item) {
+                    Permission::findOrCreate($ability.$item)->update(['group' => $item]);
+                });
         });
 
         // Create a Super-Admin Role and assign all Permissions
-        $role = Role::create(['name' => 'super-admin']);
-        $role->givePermissionTo(Permission::all());
+        $role = Role::findOrCreate('super-admin');
+        $role->syncPermissions(Permission::all());
 
         // Give User Super-Admin Role
         // $user = \App\Models\User::where('email', 'your@email.com')->first(); // Change this to your email.

@@ -8,6 +8,7 @@ use Laravel\Nova\Fields\ID;
 use Laravel\Nova\Fields\MorphToMany;
 use Laravel\Nova\Fields\Select;
 use Laravel\Nova\Fields\Text;
+use Laravel\Nova\Http\Requests\NovaRequest;
 use Spatie\Permission\Models\Permission as PermissionModel;
 
 /**
@@ -70,7 +71,7 @@ class Permission extends Resource
         $guardOptions = $this->guardOptions($request);
         $userResource = $this->userResource();
 
-        return [
+        $fields = [
             ID::make(__('ID'), 'id')
                 ->rules('required')
                 ->canSee(function ($request) {
@@ -79,8 +80,8 @@ class Permission extends Resource
 
             Text::make(__('Name'), 'name')
                 ->rules(['required', 'string', 'max:255'])
-                ->creationRules('unique:' . config('permission.table_names.permissions'))
-                ->updateRules('unique:' . config('permission.table_names.permissions') . ',name,{{resourceId}}'),
+                ->creationRules(fn (NovaRequest $request) => [$this->uniqueNameRule($request)])
+                ->updateRules(fn (NovaRequest $request) => [$this->uniqueNameRule($request)->ignore($request->resourceId)]),
 
             Text::make(__('Group'), 'group')
                 ->rules(['required', 'string', 'max:255']),
@@ -98,12 +99,15 @@ class Permission extends Resource
                     return $this->fieldAvailable('roles');
                 }),
 
-            MorphToMany::make($userResource::label(), 'users', $userResource)
-                ->searchable()
-                ->canSee(function ($request) {
-                    return $this->fieldAvailable('users');
-                }),
         ];
+
+        if ($userResource) {
+            $fields[] = MorphToMany::make($userResource::label(), 'users', $userResource)
+                ->searchable()
+                ->canSee(fn () => $this->fieldAvailable('users'));
+        }
+
+        return $fields;
     }
 
     /**
@@ -124,6 +128,12 @@ class Permission extends Resource
     public static function singularLabel()
     {
         return __('Permission');
+    }
+
+    protected function uniqueNameRule(NovaRequest $request)
+    {
+        return Rule::unique(config('permission.table_names.permissions'), 'name')
+            ->where('guard_name', $request->input('guard_name', $this->guard_name));
     }
 
 }

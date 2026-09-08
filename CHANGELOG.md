@@ -1,5 +1,14 @@
 # Release Notes
 
+## Unreleased
+
+- Target Nova 5.9 and its current Nova devtool build stack.
+- Use Spatie's canonical permission migration and publish an additive `group` migration.
+- Fix grouped checkbox serialization and group selection state on Nova 5.
+- Scope permissions and unique-name validation by guard.
+- Make the example seeder repeatable and use Nova's `forceDelete` policy ability.
+- Fix custom menu disabling and remove obsolete empty tool routes.
+
 ## 1.7.0 (2024-12-27)
 
 - Add support for Laravel Nova 5

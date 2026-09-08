@@ -183,8 +183,8 @@ class NovaPermissions extends Tool
     public function disableMenu()
     {
         $this->menuDisabled = true;
-        $this->roleResource::$displayInNavigation = $this->menuDisabled;
-        $this->permissionResource::$displayInNavigation = $this->menuDisabled;
+        $this->roleResource::$displayInNavigation = false;
+        $this->permissionResource::$displayInNavigation = false;
         return $this;
     }
 
@@ -200,21 +200,20 @@ class NovaPermissions extends Tool
             return [];
         }
 
-        $itens = [$this->createMenuItem($this->roleResource)];
+        $items = [$this->createMenuItem($this->roleResource)];
 
         if ($this->displayPermissions) {
-            $itens[] = $this->createMenuItem($this->permissionResource);
+            $items[] = $this->createMenuItem($this->permissionResource);
         }
 
-        return MenuSection::make(__('Roles & Permissions'), $itens)
+        return MenuSection::make(__('Roles & Permissions'), $items)
             ->icon('shield-check')
             ->collapsable();
     }
 
     /**
-     * @param  bool $disabled
      * @param  class-string<\Laravel\Nova\Resource>  $resourceClass
-     * @return void
+     * @return \Laravel\Nova\Menu\MenuItem
      */
     protected function createMenuItem($resourceClass)
     {

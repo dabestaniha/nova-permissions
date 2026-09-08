@@ -24,15 +24,15 @@ abstract class Resource extends NovaResource
      * Get the available guards.
      *
      * @param \Laravel\Nova\Http\Requests\NovaRequest  $request
-     * @return string
+     * @return array<int, string>
      */
-    protected function guards($request)
+    protected function guards($request): array
     {
         if (static::$resolveGuardsCallback) {
-            return call_user_func(static::$resolveGuardsCallback, $request);
+            return array_values(call_user_func(static::$resolveGuardsCallback, $request));
         }
 
-        return array_keys(config('auth.guards'));
+        return array_keys(config('auth.guards', []));
     }
 
     /**
@@ -41,7 +41,7 @@ abstract class Resource extends NovaResource
      * @param \Illuminate\Support\Collection  $options
      * @return string
      */
-    protected function defaultGuard($options)
+    protected function defaultGuard($options): ?string
     {
         return $options->count() === 1 ? $options->first() : null;
     }
@@ -64,7 +64,7 @@ abstract class Resource extends NovaResource
      *
      * @return string
      */
-    protected function userResource()
+    protected function userResource(): ?string
     {
         $model = $this->modelForGuard();
 
@@ -77,9 +77,9 @@ abstract class Resource extends NovaResource
      * @param string $name
      * @return bool
      */
-    protected function fieldAvailable($name)
+    protected function fieldAvailable($name): bool
     {
-        return ! in_array($name, static::$hiddenFields);
+        return ! in_array($name, static::$hiddenFields, true);
     }
 
 }

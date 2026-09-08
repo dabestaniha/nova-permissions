@@ -1,8 +1,9 @@
 laravel: '@testbench'
 
+dont-discover:
+  - laravel/nova-devtool
+
 providers:
-  - Laravel\Nova\NovaServiceProvider
-  - Laravel\Nova\NovaCoreServiceProvider
   - Workbench\App\Providers\NovaServiceProvider
   - Spatie\Permission\PermissionServiceProvider
   - Sereny\NovaPermissions\ToolServiceProvider

@@ -3,6 +3,7 @@
 namespace Sereny\NovaPermissions\Traits;
 
 use Sereny\NovaPermissions\ModelForGuardState;
+use Spatie\Permission\Guard;
 
 trait ModelForGuardResolver {
 
@@ -11,10 +12,10 @@ trait ModelForGuardResolver {
      *
      * @return class-string
      */
-    public function modelForGuard()
+    public function modelForGuard(): ?string
     {
         return ModelForGuardState::$resolveModelForGuardCallback
             ? call_user_func(ModelForGuardState::$resolveModelForGuardCallback)
-            : getModelForGuard($this->guard_name);
+            : Guard::getModelForGuard($this->guard_name ?? config('auth.defaults.guard'));
     }
 }

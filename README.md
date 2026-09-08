@@ -3,7 +3,9 @@
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/sereny/nova-permissions?style=flat-square)](https://packagist.org/packages/sereny/nova-permissions)
 [![Total Downloads](https://poser.pugx.org/sereny/nova-permissions/downloads?format=flat-square)](https://packagist.org/packages/sereny/nova-permissions)
 
-A Laravel Nova Tool that allows you to group your Permissions and attach it to Users. It uses Spatie's laravel-permission.
+A Laravel Nova tool for grouping permissions and assigning roles and permissions to users. It uses Spatie's `laravel-permission` package.
+
+This release supports PHP 8.1+, Laravel Nova 5.9+, and `spatie/laravel-permission` 6.25+.
 
 We have a Migration, Seed, Policy and Resource ready for a good Authorization Experience.
 
@@ -26,7 +28,13 @@ You can install the package in to a Laravel app that uses [Nova](https://nova.la
 composer require sereny/nova-permissions
 ```
 
-Publish the Migration with the following command:
+If your application does not already use `spatie/laravel-permission`, publish its configuration and migrations first:
+
+```bash
+php artisan vendor:publish --provider="Spatie\Permission\PermissionServiceProvider"
+```
+
+Then publish this package's additive migration. It adds the `group` column used by the Nova resources without replacing Spatie's schema:
 
 ```bash
 php artisan vendor:publish --provider="Sereny\NovaPermissions\ToolServiceProvider" --tag="migrations"
@@ -45,7 +53,7 @@ Next up, you must register the tool with Nova. This is typically done in the `to
 
 // ...
 
-public function tools()
+public function tools(): array
 {
     return [
         // ...
@@ -61,7 +69,7 @@ If you want to hide the tool from certain users, you can write your custom logic
 
 // ...
 
-public function tools()
+public function tools(): array
 {
     return [
         // ...
@@ -80,7 +88,7 @@ Finally, add `MorphToMany` fields to your `app/Nova/User` resource:
 // ...
 use Laravel\Nova\Fields\MorphToMany;
 
-public function fields(Request $request)
+public function fields(\Laravel\Nova\Http\Requests\NovaRequest $request): array
 {
     return [
         // ...
@@ -124,7 +132,7 @@ A new menu item called **Roles & Permissions** will appear in your Nova app afte
 
 Publish our Seeder with the following command:
 
-```
+```bash
 php artisan vendor:publish --provider="Sereny\NovaPermissions\ToolServiceProvider" --tag="seeders"
 ```
 
@@ -133,18 +141,15 @@ This is just an example on how you could seed your Database with Roles and Permi
 ```php
 <?php
 
+namespace Database\Seeders;
+
 use Illuminate\Database\Seeder;
-use Spatie\Permission\Models\Role;
 use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
-    /**
-     * Run the database seeds.
-     *
-     * @return void
-     */
-    public function run()
+    public function run(): void
     {
         // Reset cached roles and permissions
         app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
@@ -161,23 +166,20 @@ class RolesAndPermissionsSeeder extends Seeder
             // ... your own models/permission you want to crate
         ]);
 
-        $collection->each(function ($item, $key) {
-            // create permissions for each collection item
-            Permission::create(['group' => $item, 'name' => 'viewAny' . $item]);
-            Permission::create(['group' => $item, 'name' => 'view' . $item]);
-            Permission::create(['group' => $item, 'name' => 'update' . $item]);
-            Permission::create(['group' => $item, 'name' => 'create' . $item]);
-            Permission::create(['group' => $item, 'name' => 'delete' . $item]);
-            Permission::create(['group' => $item, 'name' => 'destroy' . $item]);
+        $collection->each(function ($item) {
+            collect(['viewAny', 'view', 'update', 'create', 'delete', 'restore', 'forceDelete'])
+                ->each(function ($ability) use ($item) {
+                    Permission::findOrCreate($ability.$item)->update(['group' => $item]);
+                });
         });
 
         // Create a Super-Admin Role and assign all permissions to it
-        $role = Role::create(['name' => 'super-admin']);
-        $role->givePermissionTo(Permission::all());
+        $role = Role::findOrCreate('super-admin');
+        $role->syncPermissions(Permission::all());
 
         // Give User Super-Admin Role
-        $user = \App\Models\User::where('email', 'your@email.com')->first(); // enter your email here
-        $user->assignRole('super-admin');
+        $user = \App\Models\User::where('email', 'your@email.com')->first();
+        $user?->assignRole('super-admin');
     }
 }
 ```
@@ -212,9 +214,9 @@ class ContactPolicy extends BasePolicy
 
 It should now work as exptected. Just create a Role, modify its Permissions and the Policy should take care of the rest.
 
-> **Note**: Don't forget to add your Policy to your `$policies` in `App\Providers\AuthServiceProvider`.
+Laravel automatically discovers policies that follow its standard model and policy naming conventions. Register non-standard policy locations manually in your application's service provider.
 
-> **Note**: Only extend the Policy if you have created your Permissions according to our Seeding Example. Otherwise, make sure to have `viewAnyContact, viewContact, createContact, updateContact, deleteContact, restoreContact,  destroyContact` as Permissions in your Table in order to extend our Policy.
+> **Note**: Only extend the policy if your permission names follow this package's convention. For a `Contact` resource, those names are `viewAnyContact`, `viewContact`, `createContact`, `updateContact`, `deleteContact`, `restoreContact`, and `forceDeleteContact`.
 
 ### Super Admin
 
@@ -223,15 +225,16 @@ A Super Admin can do everything. If you extend our Policy, make sure to add a `i
 ```php
 <?php
 
-namespace App;
+namespace App\Models;
 
-class User {
+class User
+{
 
     /**
      * Determines if the User is a Super admin
-     * @return null
+     * @return bool
     */
-    public function isSuperAdmin()
+    public function isSuperAdmin(): bool
     {
         return $this->hasRole('super-admin');
     }
@@ -250,7 +253,7 @@ use App\Policies\RolePolicy;
 
 // ...
 
-public function tools()
+public function tools(): array
 {
     return [
         // ...
@@ -260,7 +263,7 @@ public function tools()
             ->rolePolicy(RolePolicy::class)
             ->permissionPolicy(PermissionPolicy::class)
             ->disablePermissions()
-            ->disableMenu();
+            ->disableMenu()
             ->hideFieldsFromRole([
                 'id',
                 'guard_name'
@@ -271,10 +274,10 @@ public function tools()
                 'users',
                 'roles'
             ])
-            ->resolveGuardsUsing(function($request) {
-                return [ 'web' ];
+            ->resolveGuardsUsing(function ($request) {
+                return ['web'];
             })
-            ->resolveModelForGuardUsing(function($request) {
+            ->resolveModelForGuardUsing(function () {
                 /** @var App\Auth\CustomGuard $guard */
                 $guard = auth()->guard();
                 return $guard->getProvider()->getModel();

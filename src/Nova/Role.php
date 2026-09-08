@@ -1,7 +1,7 @@
 <?php
 namespace Sereny\NovaPermissions\Nova;
 
-use Illuminate\Database\Query\Builder;
+use Illuminate\Contracts\Database\Eloquent\Builder;
 use Laravel\Nova\Fields\ID;
 use Illuminate\Http\Request;
 use Laravel\Nova\Fields\Text;
@@ -70,7 +70,7 @@ class Role extends Resource
         $guardOptions = $this->guardOptions($request);
         $userResource = $this->userResource();
 
-        return [
+        $fields = [
             ID::make(__('ID'), 'id')
                 ->rules('required')
                 ->canSee(function ($request) {
@@ -79,8 +79,8 @@ class Role extends Resource
 
             Text::make(__('Name'), 'name')
                 ->rules(['required', 'string', 'max:255'])
-                ->creationRules('unique:' . config('permission.table_names.roles'))
-                ->updateRules('unique:' . config('permission.table_names.roles') . ',name,{{resourceId}}'),
+                ->creationRules(fn (NovaRequest $request) => [$this->uniqueNameRule($request)])
+                ->updateRules(fn (NovaRequest $request) => [$this->uniqueNameRule($request)->ignore($request->resourceId)]),
 
             Select::make(__('Guard Name'), 'guard_name')
                 ->options($guardOptions->toArray())
@@ -91,7 +91,7 @@ class Role extends Resource
                 ->default($this->defaultGuard($guardOptions)),
 
             Checkboxes::make(__('Permissions'), 'permissions')
-                ->options($this->loadPermissions()->map(function ($permission, $key) {
+                ->options($this->loadPermissions($this->guard_name)->map(function ($permission) {
                     return [
                         'group'  => __(ucfirst($permission->group)),
                         'option' => $permission->name,
@@ -109,12 +109,15 @@ class Role extends Resource
                 return isset($this->users_count) ? $this->users_count : $this->users()->count();
             })->exceptOnForms(),
 
-            MorphToMany::make($userResource::label(), 'users', $userResource)
-                ->searchable()
-                ->canSee(function ($request) {
-                    return $this->fieldAvailable('users');
-                }),
         ];
+
+        if ($userResource) {
+            $fields[] = MorphToMany::make($userResource::label(), 'users', $userResource)
+                ->searchable()
+                ->canSee(fn () => $this->fieldAvailable('users'));
+        }
+
+        return $fields;
     }
 
     public static function label()
@@ -143,15 +146,26 @@ class Role extends Resource
      *
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    protected function loadPermissions()
+    protected function loadPermissions(?string $guardName = null)
     {
         $expirationTime = config('permission.cache.nova_expiration_time', now()->addMinute());
+        $guardName ??= config('auth.defaults.guard');
 
-        return cache()->remember('sereny-nova-permissions', $expirationTime, function () {
+        return cache()->remember("sereny-nova-permissions.{$guardName}", $expirationTime, function () use ($guardName) {
             /** @var class-string */
             $permissionClass = config('permission.models.permission');
 
-            return $permissionClass::all()->unique('name');
+            return $permissionClass::query()
+                ->where('guard_name', $guardName)
+                ->orderBy('group')
+                ->orderBy('name')
+                ->get();
         });
+    }
+
+    protected function uniqueNameRule(NovaRequest $request)
+    {
+        return Rule::unique(config('permission.table_names.roles'), 'name')
+            ->where('guard_name', $request->input('guard_name', $this->guard_name));
     }
 }
